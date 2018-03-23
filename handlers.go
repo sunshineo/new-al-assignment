@@ -103,6 +103,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		sendError("Cannot close the request body", w)
 		return
 	}
+
 	if err := json.Unmarshal(body, &user); err != nil {
 		sendError("Failed to parse the post body as JSON.", w)
 		return
@@ -118,6 +119,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if passwordLength := len(user.Password); passwordLength < 8 {
+		sendError("Password must be at least 8 characters", w)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(204)
