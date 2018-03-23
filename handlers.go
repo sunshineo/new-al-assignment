@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"regexp"
 
 	"github.com/gorilla/mux"
 )
@@ -89,22 +90,35 @@ func sendError(msg string, w http.ResponseWriter) {
 	}
 }
 
+var ValidUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	var user User
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
 	if err != nil {
 		sendError("Post body too large.", w)
+		return
 	}
 	if err := r.Body.Close(); err != nil {
 		sendError("Cannot close the request body", w)
+		return
 	}
 	if err := json.Unmarshal(body, &user); err != nil {
 		sendError("Failed to parse the post body as JSON.", w)
+		return
 	}
 
 	if usernameLength := len(user.Username); usernameLength < 3 || usernameLength > 20 {
 		sendError("Usernames must be at least 3 characters and no more than 20", w)
+		return
 	}
+
+	if !ValidUsername(user.Username) {
+		sendError("Usernames may only contain alphanumeric characters", w)
+		return
+	}
+
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(204)
 }
