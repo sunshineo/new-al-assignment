@@ -9,6 +9,8 @@ import (
 	"database/sql"
 	"log"
 
+	"./models"
+
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
@@ -16,7 +18,7 @@ import (
 )
 
 func sendError(msg string, w http.ResponseWriter) {
-	errorBody := errorJson{Error: msg}
+	errorBody := models.ErrorResponse{Error: msg}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(400)
 	if err := json.NewEncoder(w).Encode(errorBody); err != nil {
@@ -43,7 +45,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
+	var user models.User
 	if err := json.Unmarshal(body, &user); err != nil {
 		sendError("Failed to parse the post body as JSON.", w)
 		log.Print(err)
@@ -123,7 +125,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
+	var user models.User
 	if err := json.Unmarshal(body, &user); err != nil {
 		sendError("Failed to parse the post body as JSON.", w)
 		log.Print(err)
@@ -175,7 +177,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// log.Print(w.Header().Get("Set-Cookie"))
-	responseBody := tokenJson{Token: w.Header().Get("Set-Cookie")}
+	responseBody := models.TokenResponse{Token: w.Header().Get("Set-Cookie")}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(200)
 	if err := json.NewEncoder(w).Encode(responseBody); err != nil {
