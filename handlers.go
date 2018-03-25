@@ -96,7 +96,6 @@ func sendError(msg string, w http.ResponseWriter) {
 var ValidUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
 
 func Register(w http.ResponseWriter, r *http.Request) {
-	var user User
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
 	if err != nil {
 		sendError("Post body too large.", w)
@@ -109,13 +108,14 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var user User
 	if err := json.Unmarshal(body, &user); err != nil {
 		sendError("Failed to parse the post body as JSON.", w)
 		log.Print(err)
 		return
 	}
 
-	var username = user.Username
+	username := user.Username
 	if usernameLength := len(username); usernameLength < 3 || usernameLength > 20 {
 		sendError("Usernames must be at least 3 characters and no more than 20", w)
 		return
@@ -126,6 +126,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	password := user.Password
 	if passwordLength := len(user.Password); passwordLength < 8 {
 		sendError("Password must be at least 8 characters", w)
 		return
@@ -156,6 +157,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	if count > 0 {
 		sendError("This username already exists", w)
 		return
+	}
+
+	_, err = db.Query("INSERT INTO account VALUES($1, $2)", username, password)
+	if err != nil {
+		sendError("Failed to insert the user to database", w)
+		log.Print(err)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
