@@ -238,7 +238,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set user as authenticated
-	session.Values["authenticated"] = true
+	session.Values["username"] = username
 	err = session.Save(r, w)
 	if err != nil {
 		sendError("Failed to save the session", w)
@@ -254,3 +254,87 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func PutFile(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "storage-service-session")
+	if err != nil {
+		sendError("Failed to retrive the session", w)
+		log.Print(err)
+		return
+	}
+
+	// Retrieve our struct and type-assert it
+	username := session.Values["username"]
+	if username == nil {
+		sendError("You are not logged in", w)
+		return
+	}
+
+	log.Print(username)
+
+	// Now we can use our person object
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	log.Print(filename)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(200)
+}
+
+func GetFile(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "storage-service-session")
+	if err != nil {
+		sendError("Failed to retrive the session", w)
+		log.Print(err)
+		return
+	}
+
+	// Retrieve our struct and type-assert it
+	username := session.Values["username"]
+	if username == nil {
+		sendError("You are not logged in", w)
+		return
+	}
+
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	log.Print(filename)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(200)
+}
+
+func DeleteFile(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "storage-service-session")
+	if err != nil {
+		sendError("Failed to retrive the session", w)
+		log.Print(err)
+		return
+	}
+
+	// Retrieve our struct and type-assert it
+	username := session.Values["username"]
+	if username == nil {
+		sendError("You are not logged in", w)
+		return
+	}
+
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	log.Print(filename)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(200)
+}
+
+func ListFiles(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "storage-service-session")
+	if err != nil {
+		sendError("Failed to retrive the session", w)
+		log.Print(err)
+		return
+	}
+
+	// Retrieve our struct and type-assert it
+	username := session.Values["username"]
+	if username == nil {
+		sendError("You are not logged in", w)
+		return
+	}
+}

@@ -22,6 +22,26 @@ var routes = Routes{
 		Login,
 	},
 	Route{
+		"PUT",
+		"/files/{filename}",
+		PutFile,
+	},
+	Route{
+		"GET",
+		"/files/{filename}",
+		GetFile,
+	},
+	Route{
+		"DELETE",
+		"/files/{filename}",
+		DeleteFile,
+	},
+	Route{
+		"GET",
+		"/files",
+		ListFiles,
+	},
+	Route{
 		"GET",
 		"/",
 		Index,
