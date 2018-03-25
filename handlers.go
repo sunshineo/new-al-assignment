@@ -95,7 +95,11 @@ func sendError(msg string, w http.ResponseWriter) {
 	}
 }
 
-var ValidUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
+var (
+	ValidUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
+	connStr = "postgres://storage-user:storage-password@localhost:5432/postgres?sslmode=disable"
+	db, _ = sql.Open("postgres", connStr)
+)
 
 func Register(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
@@ -131,14 +135,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	password := user.Password
 	if passwordLength := len(user.Password); passwordLength < 8 {
 		sendError("Password must be at least 8 characters", w)
-		return
-	}
-
-	connStr := "postgres://storage-user:storage-password@localhost:5432/postgres?sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		sendError("Failed to connect to database", w)
-		log.Print(err)
 		return
 	}
 
@@ -207,14 +203,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	username := user.Username
 	password := user.Password
-
-	connStr := "postgres://storage-user:storage-password@localhost:5432/postgres?sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		sendError("Failed to connect to database", w)
-		log.Print(err)
-		return
-	}
 
 	rows, err := db.Query("SELECT password FROM account WHERE username = $1", username)
 	if err != nil {
