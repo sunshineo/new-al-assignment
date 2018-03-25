@@ -272,13 +272,38 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 		sendError("You are not logged in", w)
 		return
 	}
-
-	log.Print(username)
+	// log.Print(username)
 
 	// Now we can use our person object
 	vars := mux.Vars(r)
 	filename := vars["filename"]
-	log.Print(filename)
+	// log.Print(filename)
+
+	rows, err := db.Query("SELECT count(*) FROM file WHERE username = $1 AND filename =  $2", username, filename)
+	if err != nil {
+		sendError("Failed to query the database", w)
+		log.Print(err)
+		return
+	}
+	var count int
+	for rows.Next() {
+		err := rows.Scan(&count)
+		if err != nil {
+			sendError("Failed to get count from the query result", w)
+			log.Print(err)
+		}
+	}
+	if count > 0 {
+		sendError("This username + filename already exists", w)
+		return
+	}
+
+	_, err = db.Query("INSERT INTO file VALUES($1, $2)", username, filename)
+	if err != nil {
+		sendError("Failed to insert the user's file record to database", w)
+		log.Print(err)
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(200)
 }
@@ -289,12 +314,33 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 		sendError("You are not logged in", w)
 		return
 	}
-
-	log.Print(username)
+	// log.Print(username)
 
 	vars := mux.Vars(r)
 	filename := vars["filename"]
-	log.Print(filename)
+	// log.Print(filename)
+
+	rows, err := db.Query("SELECT filename FROM file WHERE username = $1 AND filename = $2", username, filename)
+	if err != nil {
+		sendError("Failed to query the database", w)
+		log.Print(err)
+		return
+	}
+
+	var filenameFromDB string
+	for rows.Next() {
+		err := rows.Scan(&filenameFromDB)
+		if err != nil {
+			sendError("Failed to get filename from the query result", w)
+			log.Print(err)
+		}
+	}
+
+	if len(filenameFromDB) == 0 {
+		sendError("Could not find the file", w)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(200)
 }
@@ -305,12 +351,19 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 		sendError("You are not logged in", w)
 		return
 	}
-
-	log.Print(username)
+	// log.Print(username)
 
 	vars := mux.Vars(r)
 	filename := vars["filename"]
-	log.Print(filename)
+	// log.Print(filename)
+
+	_, err := db.Query("DELETE FROM file WHERE username = $1 AND filename = $2", username, filename)
+	if err != nil {
+		sendError("Failed to query the database", w)
+		log.Print(err)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(200)
 }
@@ -321,6 +374,29 @@ func ListFiles(w http.ResponseWriter, r *http.Request) {
 		sendError("You are not logged in", w)
 		return
 	}
+	// log.Print(username)
 
-	log.Print(username)
+	rows, err := db.Query("SELECT filename FROM file WHERE username = $1", username)
+	if err != nil {
+		sendError("Failed to query the database", w)
+		log.Print(err)
+		return
+	}
+
+	var files []string
+	var filename string
+	for rows.Next() {
+		err := rows.Scan(&filename)
+		if err != nil {
+			sendError("Failed to get filename from the query result", w)
+			log.Print(err)
+		}
+		files = append(files, filename)
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(200)
+	if err := json.NewEncoder(w).Encode(files); err != nil {
+		panic(err)
+	}
 }
