@@ -41,24 +41,4 @@ var routes = Routes{
 		"/files",
 		ListFiles,
 	},
-	Route{
-		"GET",
-		"/",
-		Index,
-	},
-	Route{
-		"GET",
-		"/todos",
-		TodoIndex,
-	},
-	Route{
-		"POST",
-		"/todos",
-		TodoCreate,
-	},
-	Route{
-		"GET",
-		"/todos/{todoId}",
-		TodoShow,
-	},
 }
