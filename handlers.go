@@ -254,17 +254,21 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func PutFile(w http.ResponseWriter, r *http.Request) {
+func GetUsernameFromSession(r *http.Request) string {
 	session, err := store.Get(r, "storage-service-session")
 	if err != nil {
-		sendError("Failed to retrive the session", w)
 		log.Print(err)
-		return
+		return ""
 	}
 
 	// Retrieve our struct and type-assert it
-	username := session.Values["username"]
-	if username == nil {
+	username := session.Values["username"].(string)
+	return username
+}
+
+func PutFile(w http.ResponseWriter, r *http.Request) {
+	username := GetUsernameFromSession(r)
+	if len(username) == 0 {
 		sendError("You are not logged in", w)
 		return
 	}
@@ -280,19 +284,13 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetFile(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "storage-service-session")
-	if err != nil {
-		sendError("Failed to retrive the session", w)
-		log.Print(err)
-		return
-	}
-
-	// Retrieve our struct and type-assert it
-	username := session.Values["username"]
-	if username == nil {
+	username := GetUsernameFromSession(r)
+	if len(username) == 0 {
 		sendError("You are not logged in", w)
 		return
 	}
+
+	log.Print(username)
 
 	vars := mux.Vars(r)
 	filename := vars["filename"]
@@ -302,19 +300,13 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteFile(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "storage-service-session")
-	if err != nil {
-		sendError("Failed to retrive the session", w)
-		log.Print(err)
-		return
-	}
-
-	// Retrieve our struct and type-assert it
-	username := session.Values["username"]
-	if username == nil {
+	username := GetUsernameFromSession(r)
+	if len(username) == 0 {
 		sendError("You are not logged in", w)
 		return
 	}
+
+	log.Print(username)
 
 	vars := mux.Vars(r)
 	filename := vars["filename"]
@@ -324,17 +316,11 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func ListFiles(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "storage-service-session")
-	if err != nil {
-		sendError("Failed to retrive the session", w)
-		log.Print(err)
-		return
-	}
-
-	// Retrieve our struct and type-assert it
-	username := session.Values["username"]
-	if username == nil {
+	username := GetUsernameFromSession(r)
+	if len(username) == 0 {
 		sendError("You are not logged in", w)
 		return
 	}
+
+	log.Print(username)
 }
