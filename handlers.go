@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +160,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Query("INSERT INTO account VALUES($1, $2)", username, password)
+	// Hash the password before save. bcrypt has salt already
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	if err != nil {
+		sendError("Failed to hash the password", w)
+		log.Print(err)
+	}
+	passwordHash := string(bytes)
+
+	_, err = db.Query("INSERT INTO account VALUES($1, $2)", username, passwordHash)
 	if err != nil {
 		sendError("Failed to insert the user to database", w)
 		log.Print(err)
