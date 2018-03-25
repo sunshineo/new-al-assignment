@@ -17,6 +17,11 @@ var routes = Routes{
 		Register,
 	},
 	Route{
+		"POST",
+		"/login",
+		Login,
+	},
+	Route{
 		"GET",
 		"/",
 		Index,

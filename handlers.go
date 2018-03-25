@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/gorilla/sessions"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -176,5 +177,92 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(204)
+}
+
+var (
+	// key must be 16, 24 or 32 bytes long (AES-128, AES-192 or AES-256)
+	key = []byte("super-secret-key")
+	store = sessions.NewCookieStore(key)
+)
+
+func Login(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
+	if err != nil {
+		sendError("Post body too large.", w)
+		log.Print(err)
+		return
+	}
+	if err := r.Body.Close(); err != nil {
+		sendError("Cannot close the request body", w)
+		log.Print(err)
+		return
+	}
+
+	var user User
+	if err := json.Unmarshal(body, &user); err != nil {
+		sendError("Failed to parse the post body as JSON.", w)
+		log.Print(err)
+		return
+	}
+
+	username := user.Username
+	password := user.Password
+
+	connStr := "postgres://storage-user:storage-password@localhost:5432/postgres?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		sendError("Failed to connect to database", w)
+		log.Print(err)
+		return
+	}
+
+	rows, err := db.Query("SELECT password FROM account WHERE username = $1", username)
+	if err != nil {
+		sendError("Failed to query the database", w)
+		log.Print(err)
+		return
+	}
+
+	var passwordHash string
+	for rows.Next() {
+		err := rows.Scan(&passwordHash)
+		if err != nil {
+			sendError("Failed to get passwordHash from the query result", w)
+			log.Print(err)
+		}
+	}
+
+	if len(passwordHash) == 0 {
+		sendError("Could not find the user in the database", w)
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
+	if err != nil {
+		sendError("Incorrect password", w)
+		log.Print(err)
+	}
+
+	session, err := store.Get(r, "storage-service-session")
+	if err != nil {
+		sendError("Failed to create a session", w)
+		log.Print(err)
+	}
+
+	// Set user as authenticated
+	session.Values["authenticated"] = true
+	err = session.Save(r, w)
+	if err != nil {
+		sendError("Failed to save the session", w)
+		log.Print(err)
+	}
+
+	// log.Print(w.Header().Get("Set-Cookie"))
+	responseBody := tokenJson{Token: w.Header().Get("Set-Cookie")}
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(200)
+	if err := json.NewEncoder(w).Encode(responseBody); err != nil {
+		panic(err)
+	}
 }
 
