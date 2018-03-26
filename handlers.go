@@ -145,16 +145,16 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(passwordHash) == 0 {
-		LogAndSendError(err, 400, "Could not find the user in the database", w)
+		LogAndSendError(err, 403, "Could not find the user in the database", w)
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
 	if err != nil {
-		LogAndSendError(err, 400, "Incorrect password", w)
+		LogAndSendError(err, 403, "Incorrect password", w)
 	}
 
-	session, err := store.Get(r, "storage-service-session")
+	session, err := store.Get(r, "Session")
 	if err != nil {
 		LogAndSendError(err, 400, "Failed to create a session", w)
 	}
@@ -176,7 +176,11 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUsernameFromSession(r *http.Request) string {
-	session, err := store.Get(r, "storage-service-session")
+	xSession := r.Header.Get("X-Session")
+	if xSession != "" {
+		r.Header.Set("Cookie", xSession)
+	}
+	session, err := store.Get(r, "Session")
 	if err != nil {
 		return ""
 	}
@@ -247,7 +251,7 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 func GetFile(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		LogAndSendError(nil, 400, "You are not logged in", w)
+		LogAndSendError(nil, 403, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
@@ -272,14 +276,14 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(contentType) == 0 {
-		LogAndSendError(err, 400, "No such file was uploaded before", w)
+		LogAndSendError(err, 404, "No such file was uploaded before", w)
 		return
 	}
 
 	path := "files/" + username + "/" + filename
 	streamBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		LogAndSendError(err, 400, "Failed to read file from the disk.", w)
+		LogAndSendError(err, 404, "Failed to read file from the disk.", w)
 		return
 	}
 
@@ -306,7 +310,24 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 	filename := vars["filename"]
 	// log.Print(filename)
 
-	_, err := db.Query("DELETE FROM file WHERE username = $1 AND filename = $2", username, filename)
+	rows, err := db.Query("SELECT count(*) FROM file WHERE username = $1 AND filename = $2", username, filename)
+	if err != nil {
+		LogAndSendError(err, 400, "Failed to query the database", w)
+		return
+	}
+	var count int
+	for rows.Next() {
+		err := rows.Scan(&count)
+		if err != nil {
+			LogAndSendError(err, 400, "Failed to get count from the query result", w)
+		}
+	}
+	if count == 0 {
+		LogAndSendError(err, 404, "File does not exists", w)
+		return
+	}
+
+	_, err = db.Query("DELETE FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
 		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
@@ -322,7 +343,7 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 func ListFiles(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		LogAndSendError(nil, 400, "You are not logged in", w)
+		LogAndSendError(nil, 403, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
