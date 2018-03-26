@@ -324,8 +324,11 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	path := "files/" + username + "/" + filename
+	os.Remove(path)
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(200)
+	w.WriteHeader(204)
 }
 
 func ListFiles(w http.ResponseWriter, r *http.Request) {
