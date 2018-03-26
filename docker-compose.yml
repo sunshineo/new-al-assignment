@@ -1,0 +1,21 @@
+version: '2.0'
+
+services:
+  postgres:
+    build:
+      context: ./postgres
+    container_name: postgres
+    ports:
+     - "5432:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: storage-user
+      POSTGRES_PASSWORD: storage-password
+  go:
+    build: .
+    ports:
+      - "8080:8080"
+    links:
+      - postgres:postgres
+    depends_on:
+      - postgres

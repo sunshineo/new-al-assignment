@@ -33,7 +33,7 @@ func LogAndSendError(err interface{}, status int, msg string, w http.ResponseWri
 
 var (
 	ValidUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString
-	connStr = "postgres://storage-user:storage-password@localhost:5432/postgres?sslmode=disable"
+	connStr = "postgres://storage-user:storage-password@postgres:5432/postgres?sslmode=disable"
 	db, _ = sql.Open("postgres", connStr)
 )
 
