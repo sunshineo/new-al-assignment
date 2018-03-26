@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"io"
@@ -211,7 +212,7 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 	filename := vars["filename"]
 	// log.Print(filename)
 
-	rows, err := db.Query("SELECT count(*) FROM file WHERE username = $1 AND filename =  $2", username, filename)
+	rows, err := db.Query("SELECT count(*) FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
 		sendError("Failed to query the database", w)
 		log.Print(err)
@@ -238,7 +239,7 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 
 	path := "./files/" + username
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-	    os.MkdirAll(path, os.ModePerm)
+		os.MkdirAll(path, os.ModePerm)
 	}
 	file, err := os.Create(path + "/" + filename)
 	if err != nil {
@@ -282,12 +283,26 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(filenameFromDB) == 0 {
-		sendError("Could not find the file", w)
+		sendError("No such file was uploaded before", w)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	path := "files/" + username + "/" + filename
+	streamBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		sendError("Failed to read file from the disk.", w)
+		log.Print(err)
+		return
+	}
+
+	buffer := bytes.NewBuffer(streamBytes)
+
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(200)
+
+	if _, err := buffer.WriteTo(w); err != nil {
+		panic(err)
+	}
 }
 
 func DeleteFile(w http.ResponseWriter, r *http.Request) {
