@@ -5,5 +5,8 @@ CREATE TABLE account (
 
 CREATE TABLE file (
   username VARCHAR(255),
-  filename VARCHAR(255)
+  filename VARCHAR(255),
+  content_type VARCHAR(255),
+  content_length VARCHAR(255),
+  PRIMARY KEY(username, filename)
 );

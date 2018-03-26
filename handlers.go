@@ -219,7 +219,10 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Query("INSERT INTO file VALUES($1, $2)", username, filename)
+	contentType := r.Header.Get("Content-Type")
+	contentLength := r.Header.Get("Content-Length")
+
+	_, err = db.Query("INSERT INTO file VALUES($1, $2, $3, $4)", username, filename, contentType, contentLength)
 	if err != nil {
 		LogAndSendError(err, 400, "Failed to insert the user's file record to database", w)
 	}
@@ -253,21 +256,22 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	filename := vars["filename"]
 	// log.Print(filename)
 
-	rows, err := db.Query("SELECT filename FROM file WHERE username = $1 AND filename = $2", username, filename)
+	rows, err := db.Query("SELECT content_type, content_length FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
 		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 
-	var filenameFromDB string
+	var contentType string
+	var contentLength string
 	for rows.Next() {
-		err := rows.Scan(&filenameFromDB)
+		err := rows.Scan(&contentType, &contentLength)
 		if err != nil {
 			LogAndSendError(err, 400, "Failed to get filename from the query result", w)
 		}
 	}
 
-	if len(filenameFromDB) == 0 {
+	if len(contentType) == 0 {
 		LogAndSendError(err, 400, "No such file was uploaded before", w)
 		return
 	}
@@ -281,7 +285,8 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 
 	buffer := bytes.NewBuffer(streamBytes)
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", contentLength)
 	w.WriteHeader(200)
 
 	if _, err := buffer.WriteTo(w); err != nil {
