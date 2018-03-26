@@ -19,10 +19,13 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-func sendError(msg string, w http.ResponseWriter) {
+func LogAndSendError(err interface{}, status int, msg string, w http.ResponseWriter) {
+	if err != nil {
+		log.Print(err)
+	}
 	errorBody := models.ErrorResponse{Error: msg}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(400)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(errorBody); err != nil {
 		panic(err)
 	}
@@ -37,71 +40,64 @@ var (
 func Register(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
 	if err != nil {
-		sendError("Post body too large.", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Post body too large.", w)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
-		sendError("Cannot close the request body", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Cannot close the request body", w)
 		return
 	}
 
 	var user models.User
 	if err := json.Unmarshal(body, &user); err != nil {
-		sendError("Failed to parse the post body as JSON.", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to parse the post body as JSON.", w)
 		return
 	}
 
 	username := user.Username
 	if usernameLength := len(username); usernameLength < 3 || usernameLength > 20 {
-		sendError("Usernames must be at least 3 characters and no more than 20", w)
+		LogAndSendError(err, 400, "Usernames must be at least 3 characters and no more than 20", w)
 		return
 	}
 
 	if !ValidUsername(username) {
-		sendError("Usernames may only contain alphanumeric characters", w)
+		LogAndSendError(err, 400, "Usernames may only contain alphanumeric characters", w)
 		return
 	}
 
 	password := user.Password
 	if passwordLength := len(user.Password); passwordLength < 8 {
-		sendError("Password must be at least 8 characters", w)
+		LogAndSendError(err, 400, "Password must be at least 8 characters", w)
 		return
 	}
 
 	rows, err := db.Query("SELECT count(*) FROM account WHERE username = $1", username)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 	var count int
 	for rows.Next() {
 		err := rows.Scan(&count)
 		if err != nil {
-			sendError("Failed to get count from the query result", w)
-			log.Print(err)
+			LogAndSendError(err, 400, "Failed to get count from the query result", w)
 		}
 	}
 	if count > 0 {
-		sendError("This username already exists", w)
+		LogAndSendError(err, 400, "This username already exists", w)
 		return
 	}
 
 	// Hash the password before save. bcrypt has salt already
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
-		sendError("Failed to hash the password", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to hash the password", w)
 	}
 	passwordHash := string(bytes)
 
 	_, err = db.Query("INSERT INTO account VALUES($1, $2)", username, passwordHash)
 	if err != nil {
-		sendError("Failed to insert the user to database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to insert the user to database", w)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -117,20 +113,17 @@ var (
 func Login(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024)) // This will limit the whole thing down to 1MB. Should be enough
 	if err != nil {
-		sendError("Post body too large.", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Post body too large.", w)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
-		sendError("Cannot close the request body", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Cannot close the request body", w)
 		return
 	}
 
 	var user models.User
 	if err := json.Unmarshal(body, &user); err != nil {
-		sendError("Failed to parse the post body as JSON.", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to parse the post body as JSON.", w)
 		return
 	}
 
@@ -139,8 +132,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query("SELECT password FROM account WHERE username = $1", username)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 
@@ -148,34 +140,30 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		err := rows.Scan(&passwordHash)
 		if err != nil {
-			sendError("Failed to get passwordHash from the query result", w)
-			log.Print(err)
+			LogAndSendError(err, 400, "Failed to get passwordHash from the query result", w)
 		}
 	}
 
 	if len(passwordHash) == 0 {
-		sendError("Could not find the user in the database", w)
+		LogAndSendError(err, 400, "Could not find the user in the database", w)
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
 	if err != nil {
-		sendError("Incorrect password", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Incorrect password", w)
 	}
 
 	session, err := store.Get(r, "storage-service-session")
 	if err != nil {
-		sendError("Failed to create a session", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to create a session", w)
 	}
 
 	// Set user as authenticated
 	session.Values["username"] = username
 	err = session.Save(r, w)
 	if err != nil {
-		sendError("Failed to save the session", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to save the session", w)
 	}
 
 	// log.Print(w.Header().Get("Set-Cookie"))
@@ -190,19 +178,21 @@ func Login(w http.ResponseWriter, r *http.Request) {
 func GetUsernameFromSession(r *http.Request) string {
 	session, err := store.Get(r, "storage-service-session")
 	if err != nil {
-		log.Print(err)
 		return ""
 	}
 
 	// Retrieve our struct and type-assert it
-	username := session.Values["username"].(string)
-	return username
+	username := session.Values["username"]
+	if username == nil {
+		return ""
+	}
+	return username.(string)
 }
 
 func PutFile(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		sendError("You are not logged in", w)
+		LogAndSendError(nil, 403, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
@@ -214,27 +204,24 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query("SELECT count(*) FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 	var count int
 	for rows.Next() {
 		err := rows.Scan(&count)
 		if err != nil {
-			sendError("Failed to get count from the query result", w)
-			log.Print(err)
+			LogAndSendError(err, 400, "Failed to get count from the query result", w)
 		}
 	}
 	if count > 0 {
-		sendError("This username + filename already exists", w)
+		LogAndSendError(err, 400, "This username + filename already exists", w)
 		return
 	}
 
 	_, err = db.Query("INSERT INTO file VALUES($1, $2)", username, filename)
 	if err != nil {
-		sendError("Failed to insert the user's file record to database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to insert the user's file record to database", w)
 	}
 
 	path := "./files/" + username
@@ -257,7 +244,7 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 func GetFile(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		sendError("You are not logged in", w)
+		LogAndSendError(nil, 400, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
@@ -268,8 +255,7 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query("SELECT filename FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 
@@ -277,21 +263,19 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		err := rows.Scan(&filenameFromDB)
 		if err != nil {
-			sendError("Failed to get filename from the query result", w)
-			log.Print(err)
+			LogAndSendError(err, 400, "Failed to get filename from the query result", w)
 		}
 	}
 
 	if len(filenameFromDB) == 0 {
-		sendError("No such file was uploaded before", w)
+		LogAndSendError(err, 400, "No such file was uploaded before", w)
 		return
 	}
 
 	path := "files/" + username + "/" + filename
 	streamBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		sendError("Failed to read file from the disk.", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to read file from the disk.", w)
 		return
 	}
 
@@ -308,7 +292,7 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 func DeleteFile(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		sendError("You are not logged in", w)
+		LogAndSendError(nil, 400, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
@@ -319,8 +303,7 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	_, err := db.Query("DELETE FROM file WHERE username = $1 AND filename = $2", username, filename)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 
@@ -334,15 +317,14 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 func ListFiles(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromSession(r)
 	if len(username) == 0 {
-		sendError("You are not logged in", w)
+		LogAndSendError(nil, 400, "You are not logged in", w)
 		return
 	}
 	// log.Print(username)
 
 	rows, err := db.Query("SELECT filename FROM file WHERE username = $1", username)
 	if err != nil {
-		sendError("Failed to query the database", w)
-		log.Print(err)
+		LogAndSendError(err, 400, "Failed to query the database", w)
 		return
 	}
 
@@ -351,8 +333,7 @@ func ListFiles(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		err := rows.Scan(&filename)
 		if err != nil {
-			sendError("Failed to get filename from the query result", w)
-			log.Print(err)
+			LogAndSendError(err, 400, "Failed to get filename from the query result", w)
 		}
 		files = append(files, filename)
 	}
