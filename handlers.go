@@ -1,13 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"net/http"
-	"regexp"
-	"database/sql"
 	"log"
+	"net/http"
+	"os"
+	"regexp"
 
 	"./models"
 
@@ -235,8 +236,21 @@ func PutFile(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(200)
+	path := "./files/" + username
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+	    os.MkdirAll(path, os.ModePerm)
+	}
+	file, err := os.Create(path + "/" + filename)
+	if err != nil {
+		panic(err)
+	}
+	_, err = io.Copy(file, r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	w.Header().Set("Location", filename)
+	w.WriteHeader(201)
 }
 
 func GetFile(w http.ResponseWriter, r *http.Request) {
